@@ -53,6 +53,20 @@ button:hover {
     background: #0056b3;
 }
 
+#copy-joke-btn {
+    margin-top: 1em;
+    background: #002f61;
+}
+
+#copy-joke-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+#copy-joke-btn:hover {
+    background: #004ea1;
+}
+
 #joke {
     margin-top: 1em;
     max-width: 600px;
