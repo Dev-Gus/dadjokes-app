@@ -1,58 +1,15 @@
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+const getJokeBtn = document.getElementById('get-joke-btn');
+const joke = document.getElementById('joke');
+const copyJokeBtn = document.getElementById('copy-joke-btn');
+const errorMessage = document.getElementById('error-message');
+const retryBtn = document.getElementById('retry-btn');
 
-// DOM Selectors
-const SELECTORS = {
-    GET_JOKE_BTN: 'get-joke-btn',
-    JOKE: 'joke',
-    COPY_JOKE_BTN: 'copy-joke-btn'
-};
+const PLACEHOLDER_TEXT = 'Click the button above to get a dad joke!';
+const TIMEOUT_DURATION = 10000; // 10 seconds
 
-// API Configuration
-const API_CONFIG = {
-    BASE_URL: 'https://icanhazdadjoke.com/',
-    HEADERS: {
-        'Accept': 'application/json'
-    }
-};
-
-// UI Messages
-const MESSAGES = {
-    PLACEHOLDER: 'Click the button above to get a dad joke!',
-    LOADING: 'Loading...',
-    GET_JOKE_BTN_DEFAULT: 'Get a Dad Joke',
-    COPY_JOKE_BTN_DEFAULT: 'Copy Joke',
-    COPY_JOKE_BTN_COPIED: 'Copied!',
-    COPY_JOKE_BTN_FAILED: 'Failed to Copy',
-    ERROR_FETCH_JOKE: 'Failed to fetch a joke. Please try again later.'
-};
-
-// Animation & UI Constants
-const ANIMATION = {
-    FADE_IN_CLASS: 'fade-in',
-    LOADING_OPACITY: '0.6',
-    NORMAL_OPACITY: '1'
-};
-
-const TIMING = {
-    COPY_BUTTON_RESET_DELAY: 1500 // milliseconds
-};
-
-// ============================================================================
-// DOM ELEMENTS
-// ============================================================================
-
-const getJokeBtn = document.getElementById(SELECTORS.GET_JOKE_BTN);
-const jokeElement = document.getElementById(SELECTORS.JOKE);
-const copyJokeBtn = document.getElementById(SELECTORS.COPY_JOKE_BTN);
-
-// ============================================================================
-// EVENT LISTENERS
-// ============================================================================
-
-getJokeBtn.addEventListener('click', handleGetJoke);
-copyJokeBtn.addEventListener('click', handleCopyJoke);
+getJokeBtn.addEventListener('click', getJoke);
+copyJokeBtn.addEventListener('click', copyJoke);
+retryBtn.addEventListener('click', getJoke);
 
 // Initialize: disable copy button on load since only placeholder is shown
 updateCopyButtonState();
@@ -90,9 +47,16 @@ function setLoadingState(isLoading) {
     if (isLoading) {
         getJokeBtn.disabled = true;
         copyJokeBtn.disabled = true;
-        getJokeBtn.textContent = MESSAGES.LOADING;
-        jokeElement.style.opacity = ANIMATION.LOADING_OPACITY;
-        return;
+        retryBtn.disabled = true;
+        getJokeBtn.textContent = 'Loading...';
+        joke.style.opacity = '0.6';
+        hideError();
+    } else {
+        getJokeBtn.disabled = false;
+        retryBtn.disabled = false;
+        getJokeBtn.textContent = 'Get a Dad Joke';
+        joke.style.opacity = '1';
+        updateCopyButtonState();
     }
 
     getJokeBtn.disabled = false;
@@ -101,9 +65,17 @@ function setLoadingState(isLoading) {
     updateCopyButtonState();
 }
 
-/**
- * Updates the copy button's enabled/disabled state based on current joke content
- */
+function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.remove('hidden');
+    retryBtn.classList.remove('hidden');
+}
+
+function hideError() {
+    errorMessage.classList.add('hidden');
+    retryBtn.classList.add('hidden');
+}
+
 function updateCopyButtonState() {
     const jokeText = jokeElement.textContent.trim();
     const isEmpty = !jokeText || 
@@ -143,13 +115,55 @@ function updateJokeText(text) {
  */
 async function handleGetJoke() {
     setLoadingState(true);
+    hideError();
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, TIMEOUT_DURATION);
 
     try {
-        const data = await fetchJokeFromAPI();
-        updateJokeText(data.joke);
+        const response = await fetch('https://icanhazdadjoke.com/', {
+            headers: {
+                'Accept': 'application/json'
+            },
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if(!response.ok) {
+            throw new Error(`API returned status ${response.status}`);
+        }
+
+        const data = await response.json();
+        // Remove fade-in class to restart animation
+        joke.classList.remove('fade-in');
+        // Force reflow to restart animation
+        void joke.offsetWidth;
+        joke.textContent = data.joke;
+        joke.classList.add('fade-in');
+        hideError();
     } catch (error) {
-        updateJokeText(MESSAGES.ERROR_FETCH_JOKE);
+        clearTimeout(timeoutId);
+        
+        let errorMsg = 'Failed to fetch a joke. ';
+        
+        if (error.name === 'AbortError') {
+            errorMsg += 'The request timed out. Please check your connection and try again.';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            errorMsg += 'Network error. Please check your internet connection.';
+        } else {
+            errorMsg += 'Please try again later.';
+        }
+        
+        showError(errorMsg);
         console.error('Error fetching joke:', error);
+        
+        const currentJoke = joke.textContent.trim();
+        if (currentJoke === PLACEHOLDER_TEXT || currentJoke === 'Loading...' || currentJoke.startsWith('Failed to fetch')) {
+            joke.textContent = PLACEHOLDER_TEXT;
+        }
     } finally {
         setLoadingState(false);
     }
