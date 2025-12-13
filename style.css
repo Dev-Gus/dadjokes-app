@@ -112,6 +112,38 @@ button:hover {
     }
 }
 
+.error-message {
+    margin-top: 1.5em;
+    max-width: 600px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+    padding: 1em 1.5em;
+    border-radius: 8px;
+    font-size: 0.95em;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+}
+
+.error-message.hidden {
+    display: none;
+}
+
+.retry-btn {
+    margin-top: 1em;
+    background: #ffc107;
+    color: #212529;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.retry-btn:hover {
+    background: #e0a800;
+}
+
+.retry-btn.hidden {
+    display: none;
+}
+
 ::selection {
     background: #007bff22;
 }
