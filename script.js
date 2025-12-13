@@ -69,7 +69,6 @@ darkModeToggle.addEventListener('click', toggleDarkMode);
 
 // Keyboard shortcut: Enter or Space to get new joke
 document.addEventListener('keydown', (e) => {
-    // Only trigger if not typing in an input field
     if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
