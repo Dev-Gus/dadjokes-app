@@ -8,7 +8,8 @@ const SELECTORS = {
     JOKE: 'joke',
     COPY_JOKE_BTN: 'copy-joke-btn',
     ERROR_MESSAGE: 'error-message',
-    RETRY_BTN: 'retry-btn'
+    RETRY_BTN: 'retry-btn',
+    DARK_MODE_TOGGLE: 'dark-mode-toggle'
 };
 
 // API Configuration
@@ -55,6 +56,7 @@ const jokeElement = document.getElementById(SELECTORS.JOKE);
 const copyJokeBtn = document.getElementById(SELECTORS.COPY_JOKE_BTN);
 const errorMessage = document.getElementById(SELECTORS.ERROR_MESSAGE);
 const retryBtn = document.getElementById(SELECTORS.RETRY_BTN);
+const darkModeToggle = document.getElementById(SELECTORS.DARK_MODE_TOGGLE);
 
 // ============================================================================
 // EVENT LISTENERS
@@ -63,9 +65,29 @@ const retryBtn = document.getElementById(SELECTORS.RETRY_BTN);
 getJokeBtn.addEventListener('click', handleGetJoke);
 copyJokeBtn.addEventListener('click', handleCopyJoke);
 retryBtn.addEventListener('click', handleGetJoke);
+darkModeToggle.addEventListener('click', toggleDarkMode);
+
+// Keyboard shortcut: Enter or Space to get new joke
+document.addEventListener('keydown', (e) => {
+    // Only trigger if not typing in an input field
+    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (!getJokeBtn.disabled) {
+                handleGetJoke();
+            }
+        }
+    }
+});
 
 // Initialize: disable copy button on load since only placeholder is shown
 updateCopyButtonState();
+
+// Initialize dark mode from localStorage
+initDarkMode();
+
+// Load last joke from localStorage on page load
+loadLastJoke();
 
 // ============================================================================
 // API HELPERS
@@ -164,6 +186,8 @@ function triggerFadeInAnimation() {
 function updateJokeText(text) {
     triggerFadeInAnimation();
     jokeElement.textContent = text;
+    // Save joke to localStorage
+    saveJokeToStorage(text);
 }
 
 // ============================================================================
@@ -239,5 +263,66 @@ async function handleCopyJoke() {
         setTimeout(() => {
             copyJokeBtn.textContent = MESSAGES.COPY_JOKE_BTN_DEFAULT;
         }, TIMING.COPY_BUTTON_RESET_DELAY);
+    }
+}
+
+// ============================================================================
+// DARK MODE
+// ============================================================================
+
+/**
+ * Initializes dark mode from localStorage or system preference
+ */
+function initDarkMode() {
+    const savedMode = localStorage.getItem('darkMode');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedMode === 'true' || (savedMode === null && prefersDark)) {
+        document.body.classList.add('dark-mode');
+        darkModeToggle.textContent = '☀️';
+    } else {
+        document.body.classList.remove('dark-mode');
+        darkModeToggle.textContent = '🌙';
+    }
+}
+
+/**
+ * Toggles dark mode on and off
+ */
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    darkModeToggle.textContent = isDarkMode ? '☀️' : '🌙';
+    localStorage.setItem('darkMode', isDarkMode);
+}
+
+// ============================================================================
+// LOCAL STORAGE
+// ============================================================================
+
+/**
+ * Saves the current joke to localStorage
+ * @param {string} joke - The joke text to save
+ */
+function saveJokeToStorage(joke) {
+    try {
+        localStorage.setItem('lastJoke', joke);
+    } catch (error) {
+        console.error('Error saving joke to localStorage:', error);
+    }
+}
+
+/**
+ * Loads the last joke from localStorage on page load
+ */
+function loadLastJoke() {
+    try {
+        const lastJoke = localStorage.getItem('lastJoke');
+        if (lastJoke && lastJoke.trim() !== '') {
+            jokeElement.textContent = lastJoke;
+            updateCopyButtonState();
+        }
+    } catch (error) {
+        console.error('Error loading joke from localStorage:', error);
     }
 }
