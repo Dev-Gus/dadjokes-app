@@ -1,15 +1,68 @@
-const getJokeBtn = document.getElementById('get-joke-btn');
-const joke = document.getElementById('joke');
-const copyJokeBtn = document.getElementById('copy-joke-btn');
-const errorMessage = document.getElementById('error-message');
-const retryBtn = document.getElementById('retry-btn');
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 
-const PLACEHOLDER_TEXT = 'Click the button above to get a dad joke!';
-const TIMEOUT_DURATION = 10000; // 10 seconds
+// DOM Selectors
+const SELECTORS = {
+    GET_JOKE_BTN: 'get-joke-btn',
+    JOKE: 'joke',
+    COPY_JOKE_BTN: 'copy-joke-btn',
+    ERROR_MESSAGE: 'error-message',
+    RETRY_BTN: 'retry-btn'
+};
 
-getJokeBtn.addEventListener('click', getJoke);
-copyJokeBtn.addEventListener('click', copyJoke);
-retryBtn.addEventListener('click', getJoke);
+// API Configuration
+const API_CONFIG = {
+    BASE_URL: 'https://icanhazdadjoke.com/',
+    HEADERS: {
+        'Accept': 'application/json'
+    }
+};
+
+// UI Messages
+const MESSAGES = {
+    PLACEHOLDER: 'Click the button above to get a dad joke!',
+    LOADING: 'Loading...',
+    GET_JOKE_BTN_DEFAULT: 'Get a Dad Joke',
+    COPY_JOKE_BTN_DEFAULT: 'Copy Joke',
+    COPY_JOKE_BTN_COPIED: 'Copied!',
+    COPY_JOKE_BTN_FAILED: 'Failed to Copy',
+    ERROR_FETCH_BASE: 'Failed to fetch a joke. ',
+    ERROR_TIMEOUT: 'The request timed out. Please check your connection and try again.',
+    ERROR_NETWORK: 'Network error. Please check your internet connection.',
+    ERROR_GENERIC: 'Please try again later.'
+};
+
+// Animation & UI Constants
+const ANIMATION = {
+    FADE_IN_CLASS: 'fade-in',
+    LOADING_OPACITY: '0.6',
+    NORMAL_OPACITY: '1',
+    HIDDEN_CLASS: 'hidden'
+};
+
+const TIMING = {
+    COPY_BUTTON_RESET_DELAY: 1500, // milliseconds
+    REQUEST_TIMEOUT: 10000 // 10 seconds
+};
+
+// ============================================================================
+// DOM ELEMENTS
+// ============================================================================
+
+const getJokeBtn = document.getElementById(SELECTORS.GET_JOKE_BTN);
+const jokeElement = document.getElementById(SELECTORS.JOKE);
+const copyJokeBtn = document.getElementById(SELECTORS.COPY_JOKE_BTN);
+const errorMessage = document.getElementById(SELECTORS.ERROR_MESSAGE);
+const retryBtn = document.getElementById(SELECTORS.RETRY_BTN);
+
+// ============================================================================
+// EVENT LISTENERS
+// ============================================================================
+
+getJokeBtn.addEventListener('click', handleGetJoke);
+copyJokeBtn.addEventListener('click', handleCopyJoke);
+retryBtn.addEventListener('click', handleGetJoke);
 
 // Initialize: disable copy button on load since only placeholder is shown
 updateCopyButtonState();
@@ -19,17 +72,19 @@ updateCopyButtonState();
 // ============================================================================
 
 /**
- * Fetches a random dad joke from the API
+ * Fetches a random dad joke from the API with timeout support
+ * @param {AbortSignal} signal - AbortSignal for request cancellation
  * @returns {Promise<{joke: string}>} Promise that resolves with joke data
- * @throws {Error} If the API request fails
+ * @throws {Error} If the API request fails or times out
  */
-async function fetchJokeFromAPI() {
+async function fetchJokeFromAPI(signal) {
     const response = await fetch(API_CONFIG.BASE_URL, {
-        headers: API_CONFIG.HEADERS
+        headers: API_CONFIG.HEADERS,
+        signal: signal
     });
 
     if (!response.ok) {
-        throw new Error('Failed to fetch a joke');
+        throw new Error(`API returned status ${response.status}`);
     }
 
     return await response.json();
@@ -48,34 +103,40 @@ function setLoadingState(isLoading) {
         getJokeBtn.disabled = true;
         copyJokeBtn.disabled = true;
         retryBtn.disabled = true;
-        getJokeBtn.textContent = 'Loading...';
-        joke.style.opacity = '0.6';
+        getJokeBtn.textContent = MESSAGES.LOADING;
+        jokeElement.style.opacity = ANIMATION.LOADING_OPACITY;
         hideError();
-    } else {
-        getJokeBtn.disabled = false;
-        retryBtn.disabled = false;
-        getJokeBtn.textContent = 'Get a Dad Joke';
-        joke.style.opacity = '1';
-        updateCopyButtonState();
+        return;
     }
 
     getJokeBtn.disabled = false;
+    retryBtn.disabled = false;
     getJokeBtn.textContent = MESSAGES.GET_JOKE_BTN_DEFAULT;
     jokeElement.style.opacity = ANIMATION.NORMAL_OPACITY;
     updateCopyButtonState();
 }
 
+/**
+ * Displays an error message to the user
+ * @param {string} message - The error message to display
+ */
 function showError(message) {
     errorMessage.textContent = message;
-    errorMessage.classList.remove('hidden');
-    retryBtn.classList.remove('hidden');
+    errorMessage.classList.remove(ANIMATION.HIDDEN_CLASS);
+    retryBtn.classList.remove(ANIMATION.HIDDEN_CLASS);
 }
 
+/**
+ * Hides the error message and retry button
+ */
 function hideError() {
-    errorMessage.classList.add('hidden');
-    retryBtn.classList.add('hidden');
+    errorMessage.classList.add(ANIMATION.HIDDEN_CLASS);
+    retryBtn.classList.add(ANIMATION.HIDDEN_CLASS);
 }
 
+/**
+ * Updates the copy button's enabled/disabled state based on current joke content
+ */
 function updateCopyButtonState() {
     const jokeText = jokeElement.textContent.trim();
     const isEmpty = !jokeText || 
@@ -111,7 +172,7 @@ function updateJokeText(text) {
 
 /**
  * Handles the "Get a Dad Joke" button click event
- * Fetches a new joke from the API and displays it
+ * Fetches a new joke from the API and displays it with timeout handling
  */
 async function handleGetJoke() {
     setLoadingState(true);
@@ -120,49 +181,34 @@ async function handleGetJoke() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
         controller.abort();
-    }, TIMEOUT_DURATION);
+    }, TIMING.REQUEST_TIMEOUT);
 
     try {
-        const response = await fetch('https://icanhazdadjoke.com/', {
-            headers: {
-                'Accept': 'application/json'
-            },
-            signal: controller.signal
-        });
-
+        const data = await fetchJokeFromAPI(controller.signal);
         clearTimeout(timeoutId);
-
-        if(!response.ok) {
-            throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data = await response.json();
-        // Remove fade-in class to restart animation
-        joke.classList.remove('fade-in');
-        // Force reflow to restart animation
-        void joke.offsetWidth;
-        joke.textContent = data.joke;
-        joke.classList.add('fade-in');
+        updateJokeText(data.joke);
         hideError();
     } catch (error) {
         clearTimeout(timeoutId);
         
-        let errorMsg = 'Failed to fetch a joke. ';
+        let errorMsg = MESSAGES.ERROR_FETCH_BASE;
         
         if (error.name === 'AbortError') {
-            errorMsg += 'The request timed out. Please check your connection and try again.';
+            errorMsg += MESSAGES.ERROR_TIMEOUT;
         } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-            errorMsg += 'Network error. Please check your internet connection.';
+            errorMsg += MESSAGES.ERROR_NETWORK;
         } else {
-            errorMsg += 'Please try again later.';
+            errorMsg += MESSAGES.ERROR_GENERIC;
         }
         
         showError(errorMsg);
         console.error('Error fetching joke:', error);
         
-        const currentJoke = joke.textContent.trim();
-        if (currentJoke === PLACEHOLDER_TEXT || currentJoke === 'Loading...' || currentJoke.startsWith('Failed to fetch')) {
-            joke.textContent = PLACEHOLDER_TEXT;
+        const currentJoke = jokeElement.textContent.trim();
+        if (currentJoke === MESSAGES.PLACEHOLDER || 
+            currentJoke === MESSAGES.LOADING || 
+            currentJoke.startsWith(MESSAGES.ERROR_FETCH_BASE)) {
+            jokeElement.textContent = MESSAGES.PLACEHOLDER;
         }
     } finally {
         setLoadingState(false);
